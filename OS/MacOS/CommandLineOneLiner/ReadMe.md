@@ -4,6 +4,7 @@
 
 <!-- code_chunk_output -->
 
+- [Restart Font Registration](#restart-font-registration)
 - [Find the big/large files in a certain directory](#find-the-biglarge-files-in-a-certain-directory)
 - [LogFiles](#logfiles)
   - [Show](#show)
@@ -31,6 +32,12 @@
 - [Ressources](#ressources)
 
 <!-- /code_chunk_output -->
+
+## Restart Font Registration
+
+```bash
+sudo pkill -f CoreServicesUIAgent  # Restarts Font Registration
+```
 
 ## Find the big/large files in a certain directory
 
