@@ -408,6 +408,7 @@ you will sometimes get the message: The upstream branch of your current branch d
     git tag -d <tag>        // Delete Tag Locally
     git push origin :<tag>  // Delete Remote Tag
     git describe --tags --abbrev=0  // show latest tag in current branch
+    git diff v10.4.15 v11.0.1 (compare tags)
 
 ## Correct last commit
 
