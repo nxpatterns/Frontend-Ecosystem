@@ -1,38 +1,5 @@
 # CommandLine OneLiner
 
-<!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
-
-<!-- code_chunk_output -->
-
-- [Restart Font Registration](#restart-font-registration)
-- [Find the big/large files in a certain directory](#find-the-biglarge-files-in-a-certain-directory)
-- [LogFiles](#logfiles)
-  - [Show](#show)
-  - [Sort](#sort)
-- [Change or Add Environment Variables](#change-or-add-environment-variables)
-- [Show OS Version](#show-os-version)
-- [Show Architecture](#show-architecture)
-- [Kill Port](#kill-port)
-- [Show Running Webserver](#show-running-webserver)
-- [Command Timing](#command-timing)
-- [Rename all files in a folder](#rename-all-files-in-a-folder)
-  - [Search for video files containing a specific string on a specific volume or folder](#search-for-video-files-containing-a-specific-string-on-a-specific-volume-or-folder)
-  - [Search for video files](#search-for-video-files)
-  - [Search and replace in file names](#search-and-replace-in-file-names)
-  - [Set extension to jpg](#set-extension-to-jpg)
-- [Delete all Files and Directories (including .files) in current directory](#delete-all-files-and-directories-including-files-in-current-directory)
-- [Show only file names without extension](#show-only-file-names-without-extension)
-- [Tree on Windows (cygwin)](#tree-on-windows-cygwin)
-- [Convert CRLFS to LFS](#convert-crlfs-to-lfs)
-- [Find & Delete Files/Directories (-exec)](#find--delete-filesdirectories--exec)
-- [Show Directory size](#show-directory-size)
-  - [Simple Examples](#simple-examples)
-  - [A more sophisticated example](#a-more-sophisticated-example)
-- [Search for a file but exclude a directory](#search-for-a-file-but-exclude-a-directory)
-- [Ressources](#ressources)
-
-<!-- /code_chunk_output -->
-
 ## Restart Font Registration
 
 ```bash
