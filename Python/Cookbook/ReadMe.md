@@ -9,18 +9,8 @@
     - [Delete Existing Anaconda Installation (if applicable)](#delete-existing-anaconda-installation-if-applicable)
     - [Install Anaconda](#install-anaconda)
   - [Conda Cheatsheet](#conda-cheatsheet)
-    - [Change Conda Prompt Format](#change-conda-prompt-format)
-    - [List Environments](#list-environments)
-    - [Create Conda Environment](#create-conda-environment)
-    - [Activate Conda Environment](#activate-conda-environment)
-    - [Deactivate Conda Environment](#deactivate-conda-environment)
-    - [Remove Conda Environment](#remove-conda-environment)
-    - [Rename Conda Environment](#rename-conda-environment)
-    - [Clone/Duplicate Conda Environment](#cloneduplicate-conda-environment)
-    - [Disable Automatic Activation of `base`ENV](#disable-automatic-activation-of-baseenv)
-  - [Update Base Environment](#update-base-environment)
-- [Code Examples](#code-examples)
-  - [Create QR Code](#create-qr-code)
+    - [Pip installs globally instead of in the current environment](#pip-installs-globally-instead-of-in-the-current-environment)
+    - [Repair Base Environment](#repair-base-environment)
 
 <!-- /code_chunk_output -->
 
@@ -50,6 +40,38 @@ conda init
 ```
 
 ### Conda Cheatsheet
+
+Starting with conda 25.3, the implicit addition of 'defaults' channel will be removed.To resolve this:
+
+```shell
+conda config --add channels defaults
+# to verify
+conda config --show channels
+```
+
+#### Pip installs globally instead of in the current environment
+
+```shell
+conda config --set pip_interop_enabled True
+conda config --append channels pip
+conda config --show channels
+conda install <package>
+
+```
+
+#### Repair Base Environment
+
+```shell
+conda update -n base conda
+# If that fails, reset base to default:
+conda install --rev 0
+# If you need a complete reset:
+conda remove --name base --all
+conda create --name base python=3.12
+# Verify environment health:
+conda list
+conda info
+````
 
 #### Change Conda Prompt Format
 
