@@ -23,8 +23,9 @@ PNPM (Performant NPM) is a fast, disk space-efficient package manager. It is an 
             2. [Can you use both?](#can-you-use-both)
 2. [Migration](#migration)
     1. [From NPM to PNPM](#from-npm-to-pnpm)
-3. [Version Management](#version-management)
-    1. [n for Linux/macOS](#n-for-linuxmacos)
+3. [Update pnpm](#update-pnpm)
+4. [Version Management](#version-management)
+    1. [n for Node on Linux/macOS](#n-for-node-on-linuxmacos)
     2. [npm config files management](#npm-config-files-management)
 
 <!-- /code_chunk_output -->
@@ -131,9 +132,17 @@ This gives you pnpm's superior dependency handling + nx's intelligent caching/bu
 
 The main gotcha: some tools expect npm's node\_modules structure. Most modern tools handle pnpm fine, but legacy tools might break.
 
+## Update pnpm
+
+To update pnpm, run:
+
+```bash
+pnpm self-update
+```
+
 ## Version Management
 
-### n for Linux/macOS
+### n for Node on Linux/macOS
 
 `n` is a Node.js version manager that allows you to easily switch between Node.js versions. (Details here: [github.com/tj/n](https://github.com/tj/n))
 
