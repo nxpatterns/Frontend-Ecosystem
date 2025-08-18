@@ -7,6 +7,7 @@
 1. [Getting](#getting)
 2. [Initial Setup](#initial-setup)
     1. [Update & Upgrade](#update--upgrade)
+    2. [Manage Initial Host Name](#manage-initial-host-name)
 3. [Install ISPConfig](#install-ispconfig)
 
 <!-- /code_chunk_output -->
@@ -46,9 +47,30 @@ ssh your-alias-name
 apt update && apt upgrade -y
 ```
 
+### Manage Initial Host Name
+
+```bash
+hostnamectl set-hostname server.my-domain.com
+echo "127.0.0.1 server.my-domain.com server" >> /etc/hosts
+```
+
+Create a new A-Record in your DNS settings pointing to the server's IP address:
+
+```plaintext
+A   server.my-domain.com   <your-server-ip>
+```
+
 ## Install ISPConfig
 
 ```shell
 wget -O ispconfig3-install.sh https://get.ispconfig.org
 bash ispconfig3-install.sh
+```
+
+You will get the message:
+
+```bash
+WARNING! This script will reconfigure your entire server!
+It should be run on a freshly installed server and all current configuration that you have done will most likely be lost!
+Type 'yes' if you really want to continue: yes
 ```
