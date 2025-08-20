@@ -1,4 +1,4 @@
-# Hetzner Debian Setup
+# Hetzner Debian Setup (DEV Server)
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=5 orderedList=true} -->
 
@@ -8,7 +8,9 @@
 2. [Initial Setup](#initial-setup)
     1. [Update & Upgrade](#update--upgrade)
     2. [Manage Initial Host Name](#manage-initial-host-name)
-3. [Install ISPConfig](#install-ispconfig)
+        1. [Verification](#verification)
+3. [Small Bash Improvements](#small-bash-improvements)
+4. [Install ISPConfig](#install-ispconfig)
 
 <!-- /code_chunk_output -->
 
@@ -50,14 +52,83 @@ apt update && apt upgrade -y
 ### Manage Initial Host Name
 
 ```bash
-hostnamectl set-hostname server.my-domain.com
-echo "127.0.0.1 server.my-domain.com server" >> /etc/hosts
+hostnamectl set-hostname sub.domain.com
+```
+
+Add it to `/etc/hosts`:
+
+```plaintext
+# replace 188.x.x.x with your server's IP address
+
+127.0.0.1 localhost
+188.x.x.x www.example.com example.com
+
+# Or Sub Domain
+# 188.x.x.x dev.example.com dev
+
+# First entry is canonical, rest are aliases. You can reorder aliases:
+# All Subdomains are resolved to the same IP
+# (And maybe main domains hosted somewhere else)
+188.x.x.x dev.example.com demo.whatever.com example
+
+# The following lines are desirable for IPv6 capable hosts
+::1 localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+
 ```
 
 Create a new A-Record in your DNS settings pointing to the server's IP address:
 
 ```plaintext
-A   server.my-domain.com   <your-server-ip>
+A   example.com   <your-server-ip>
+
+# Or Sub Domain
+A   dev.example.com   <your-server-ip>
+```
+
+If you want to use different servers for different subdomains, you can create additional Records like:
+
+```plaintext
+A   dev.example.com   <your-server-ip>
+A   test.example.com   <your-server-ip>
+A   @   <your-server-ip> # for the main domain, e.g. example.com
+CNAME   www.example.com example.com
+```
+
+#### Verification
+
+```bash
+hostname -f
+# Should return: www.example.com
+
+ping www.example.com
+# Should resolve to 188.x.x.x
+```
+
+## Small Bash Improvements
+
+Remove some commented lines (for colorization) and add some useful aliases in your `.bashrc` file:
+
+```bash
+# You may uncomment the following lines if you want `ls' to be colorized:
+export LS_OPTIONS='--color=auto'
+eval "$(dircolors)"
+alias ls='ls $LS_OPTIONS'
+alias ll='ls $LS_OPTIONS -l'
+alias l='ls $LS_OPTIONS -lA'
+#
+# Some more alias to avoid making mistakes:
+alias rm='rm -i'
+alias cp='cp -i'
+alias mv='mv -i'
+. "/root/.acme.sh/acme.sh.env"
+```
+
+Then activate it:
+
+```bash
+source ~/.bashrc
 ```
 
 ## Install ISPConfig
@@ -73,4 +144,19 @@ You will get the message:
 WARNING! This script will reconfigure your entire server!
 It should be run on a freshly installed server and all current configuration that you have done will most likely be lost!
 Type 'yes' if you really want to continue: yes
+```
+
+then after you type `yes`, the installation will start. And you will get:
+
+```bash
+[INFO] Installation ready.
+[INFO] Your ISPConfig admin password is: ....
+[INFO] Your MySQL root password is: ...
+[INFO] Warning: Please delete the log files in /root/ispconfig-install-log/setup-* once you don't need them anymore because they contain your passwords!
+```
+
+Important: Delete them immediately!
+
+```bash
+rm -rf /root/ispconfig-install-log/setup-*
 ```
