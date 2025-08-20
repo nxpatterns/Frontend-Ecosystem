@@ -11,6 +11,11 @@
         1. [Verification](#verification)
 3. [Small Bash Improvements](#small-bash-improvements)
 4. [Install ISPConfig](#install-ispconfig)
+5. [Secure Standard Server Domain](#secure-standard-server-domain)
+    1. [Install Certbox](#install-certbox)
+    2. [Add SSL Certificate](#add-ssl-certificate)
+    3. [Enable SSL & Restart Apache](#enable-ssl--restart-apache)
+    4. [Verification](#verification-1)
 
 <!-- /code_chunk_output -->
 
@@ -159,4 +164,33 @@ Important: Delete them immediately!
 
 ```bash
 rm -rf /root/ispconfig-install-log/setup-*
+```
+
+## Secure Standard Server Domain
+
+e.g. `dev.example.com`
+
+### Install Certbox
+
+```bash
+apt update && apt install certbot python3-certbot-apache
+```
+
+### Add SSL Certificate
+
+```bash
+certbot --apache -d dev.example.com
+```
+
+### Enable SSL & Restart Apache
+
+```bash
+a2enmod ssl
+systemctl restart apache2
+```
+
+### Verification
+
+```bash
+dig dev.example.com A
 ```
