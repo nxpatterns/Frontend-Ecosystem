@@ -25,6 +25,11 @@
 7. [GitLab Getting Started](#gitlab-getting-started)
     1. [Initial Steps](#initial-steps)
     2. [SSL Issues (Tricky!)](#ssl-issues-tricky)
+    3. [Renewing the Certificate](#renewing-the-certificate)
+    4. [SSL Certificate Management Decision](#ssl-certificate-management-decision)
+    5. [Reverse Proxy for GitLab](#reverse-proxy-for-gitlab)
+        1. [Enable Apache Modules](#enable-apache-modules)
+        2. [Create Apache Directives](#create-apache-directives)
 
 <!-- /code_chunk_output -->
 
@@ -349,4 +354,52 @@ These files will be updated when the certificate renews.
 
 NEXT STEPS:
 - This certificate will not be renewed automatically. Autorenewal of --manual certificates requires the use of an authentication hook script (--manual-auth-hook) but one was not provided. To renew this certificate, repeat this same certbot command before the certificate's expiry date.
+```
+
+### Renewing the Certificate
+
+```bash
+certbot renew
+```
+
+### SSL Certificate Management Decision
+
+We evaluated two primary options for SSL certificate management. The first option involved using `Hetzner DNS API` automation through the `certbot-dns-hetzner plugin`, which would enable automatic certificate renewal by creating and removing DNS TXT records via the Hetzner DNS API. The second option was implementing an IPConfig reverse proxy where SSL termination is handled by IPConfig with automatic Let's Encrypt renewal.
+
+We decided to implement the IPConfig reverse proxy approach primarily due to security considerations. The Hetzner DNS API token grants full DNS control over all domains in the account, creating a significant security risk. If the server were compromised, an attacker would gain access to modify DNS records, redirect domains, or perform DNS hijacking attacks across all managed domains. This represents an unacceptable blast radius for a potential security incident.
+
+The IPConfig reverse proxy approach follows the principle of least privilege by handling SSL termination without requiring elevated DNS permissions. This solution provides operational simplicity as it eliminates the need for API token management, rotation, or monitoring.
+
+The trade-off involves creating a dependency on IPConfig for SSL management, but this is acceptable given the eliminated DNS security risk and reduced operational complexity.
+
+### Reverse Proxy for GitLab
+
+#### Enable Apache Modules
+
+```bash
+a2enmod proxy
+a2enmod proxy_http
+a2enmod headers
+systemctl reload apache2
+```
+
+#### Create Apache Directives
+
+Login in IPConfig, create a new site, e.g. `git.example.com` and change to the options tab and enter the following directives into the `Apache Directives` textarea:
+
+```apache
+ProxyPreserveHost On
+ProxyPass / http://127.0.0.1:8090/
+ProxyPassReverse / http://127.0.0.1:8090/
+
+# Additional headers for GitLab
+ProxyPassReverse / http://127.0.0.1:8090/
+RequestHeader set X-Forwarded-Proto "https"
+RequestHeader set X-Forwarded-For %h
+```
+
+Apply/Save Changes. Then Enable SSL in the "Domain" tab (Let's Encrypt). And restart Apache.
+
+```bash
+systemctl restart apache2
 ```
