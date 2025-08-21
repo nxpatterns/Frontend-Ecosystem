@@ -20,7 +20,11 @@
 6. [Install GitLab & GitLab Runner (via Docker)](#install-gitlab--gitlab-runner-via-docker)
     1. [GitLab Directory Structure](#gitlab-directory-structure)
     2. [GitLab Docker Compose File](#gitlab-docker-compose-file)
-    3. [Compose](#compose)
+    3. [Compose & Verify](#compose--verify)
+    4. [Initial Root Password](#initial-root-password)
+7. [GitLab Getting Started](#gitlab-getting-started)
+    1. [Initial Steps](#initial-steps)
+    2. [SSL Issues (Tricky!)](#ssl-issues-tricky)
 
 <!-- /code_chunk_output -->
 
@@ -254,9 +258,9 @@ services:
         letsencrypt['contact_emails'] = ['your-email@domain.com']  # CHANGE THIS
         gitlab_rails['gitlab_shell_ssh_port'] = 2222
     ports:
-      - '80:80'
-      - '443:443'
-      - '2222:22'
+      - '8090:80' # HTTP auf 8090
+      - '8443:443' # HTTPS auf 8443
+      - '2222:22'  # SSH auf 2222
     volumes:
       - '/srv/gitlab/config:/etc/gitlab'
       - '/srv/gitlab/logs:/var/log/gitlab'
@@ -264,9 +268,85 @@ services:
     shm_size: '256m'
 ```
 
-### Compose
+### Compose & Verify
 
 ```bash
 cd /srv/gitlab
+# docker compose down # if you have to
 docker-compose up -d
+```
+
+Check Composer Logs & Status
+
+```bash
+docker compose logs -f gitlab
+docker compose ps
+```
+
+### Initial Root Password
+
+```bash
+docker exec -it gitlab-gitlab-1 cat /etc/gitlab/initial_root_password
+```
+
+You'll see:
+
+```plaintext
+WARNING: This value is valid only in the following conditions
+
+1. If provided manually (either via `GITLAB_ROOT_PASSWORD` environment variable or via `gitlab_rails['initial_root_password']` setting in `gitlab.rb`, it was provided before database was seeded for the first time (usually, the first reconfigure run).
+
+2. Password hasn't been changed manually, either via UI or via command line.
+
+If the password shown here doesn't work, you must reset the admin password following https://docs.gitlab.com/ee/security/reset_user_password.html#reset-your-root-password.
+
+Password: ....=
+
+# NOTE: This file will be automatically deleted in the first reconfigure run after 24 hours.
+```
+
+## GitLab Getting Started
+
+### Initial Steps
+
+Your GitLab instance allows anyone to register for an account, which is a security risk on public-facing GitLab instances. You should deactivate new sign ups if public users aren't expected to register for an account.
+
+### SSL Issues (Tricky!)
+
+Try
+
+```bash
+certbot certonly --manual --preferred-challenges dns -d git.example.com
+```
+
+You'll get the info:
+
+```plaintext
+Please deploy a DNS TXT record under the name:
+_acme-challenge.git.example.com.
+with the following value:
+0T2kQx3Goo5J-XEw76FHRpe471GsAVQujrLu2igKSoU
+Before continuing, verify the TXT record has been deployed.
+
+- - - - - - - - - - - - - - - -
+Press Enter to Continue
+```
+
+Then you need to add the TXT record in your DNS settings before. Then **you have to check, if the value is set, before pressing Enter!**.
+
+```bash
+dig -t TXT _acme-challenge.git.example.com
+```
+
+Then you will get the Info:
+
+```plaintext
+Successfully received certificate.
+Certificate is saved at: /etc/letsencrypt/live/git.example.com/fullchain.pem
+Key is saved at:         /etc/letsencrypt/live/git.example.com/privkey.pem
+This certificate expires on 2025-11-19.
+These files will be updated when the certificate renews.
+
+NEXT STEPS:
+- This certificate will not be renewed automatically. Autorenewal of --manual certificates requires the use of an authentication hook script (--manual-auth-hook) but one was not provided. To renew this certificate, repeat this same certbot command before the certificate's expiry date.
 ```
