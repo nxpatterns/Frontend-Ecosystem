@@ -9,13 +9,18 @@
     1. [Update & Upgrade](#update--upgrade)
     2. [Manage Initial Host Name](#manage-initial-host-name)
         1. [Verification](#verification)
-3. [Small Bash Improvements](#small-bash-improvements)
-4. [Install ISPConfig](#install-ispconfig)
-5. [Secure Standard Server Domain](#secure-standard-server-domain)
+    3. [Small Bash Improvements](#small-bash-improvements)
+3. [Install ISPConfig](#install-ispconfig)
+4. [Secure Standard Server Domain](#secure-standard-server-domain)
     1. [Install Certbox](#install-certbox)
     2. [Add SSL Certificate](#add-ssl-certificate)
     3. [Enable SSL & Restart Apache](#enable-ssl--restart-apache)
     4. [Verification](#verification-1)
+5. [Install Docker (Secure with Key Check)](#install-docker-secure-with-key-check)
+6. [Install GitLab & GitLab Runner (via Docker)](#install-gitlab--gitlab-runner-via-docker)
+    1. [GitLab Directory Structure](#gitlab-directory-structure)
+    2. [GitLab Docker Compose File](#gitlab-docker-compose-file)
+    3. [Compose](#compose)
 
 <!-- /code_chunk_output -->
 
@@ -111,7 +116,7 @@ ping www.example.com
 # Should resolve to 188.x.x.x
 ```
 
-## Small Bash Improvements
+### Small Bash Improvements
 
 Remove some commented lines (for colorization) and add some useful aliases in your `.bashrc` file:
 
@@ -193,4 +198,75 @@ systemctl restart apache2
 
 ```bash
 dig dev.example.com A
+```
+
+## Install Docker (Secure with Key Check)
+
+```bash
+# First update & upgrade
+apt update && apt upgrade -y
+
+# Install Docker prerequisites
+apt install -y ca-certificates curl gnupg lsb-release
+
+# Add Docker's official GPG key
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+# Add the official Docker repository to your Debian/Ubuntu system's APT sources. Note: The GPG key must already exist at /etc/apt/keyrings/docker.gpg or apt will fail during update.
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Update again (with activated Docker repository above)
+apt update
+
+# Install Docker Engine, CLI, Containerd, and Docker Compose
+apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Start Docker
+systemctl enable docker
+systemctl start docker
+```
+
+## Install GitLab & GitLab Runner (via Docker)
+
+### GitLab Directory Structure
+
+```bash
+mkdir -p /srv/gitlab/{config,data,logs}
+```
+
+### GitLab Docker Compose File
+
+Create `/srv/gitlab/docker-compose.yml` with the following content:
+
+```yaml
+version: '3.6'
+services:
+  gitlab:
+    image: 'gitlab/gitlab-ce:latest'
+    restart: always
+    hostname: 'git.takemarco.trybox.eu'
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'https://git.takemarco.trybox.eu'
+        letsencrypt['enable'] = true
+        letsencrypt['contact_emails'] = ['your-email@domain.com']  # CHANGE THIS
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+    ports:
+      - '80:80'
+      - '443:443'
+      - '2222:22'
+    volumes:
+      - '/srv/gitlab/config:/etc/gitlab'
+      - '/srv/gitlab/logs:/var/log/gitlab'
+      - '/srv/gitlab/data:/var/opt/gitlab'
+    shm_size: '256m'
+```
+
+### Compose
+
+```bash
+cd /srv/gitlab
+docker-compose up -d
 ```
