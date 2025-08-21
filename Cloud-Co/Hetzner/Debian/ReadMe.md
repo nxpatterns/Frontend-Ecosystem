@@ -246,10 +246,10 @@ services:
   gitlab:
     image: 'gitlab/gitlab-ce:latest'
     restart: always
-    hostname: 'git.takemarco.trybox.eu'
+    hostname: 'https://git.example.com'
     environment:
       GITLAB_OMNIBUS_CONFIG: |
-        external_url 'https://git.takemarco.trybox.eu'
+        external_url 'https://git.example.com'
         letsencrypt['enable'] = true
         letsencrypt['contact_emails'] = ['your-email@domain.com']  # CHANGE THIS
         gitlab_rails['gitlab_shell_ssh_port'] = 2222
