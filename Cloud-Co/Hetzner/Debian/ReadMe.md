@@ -1,6 +1,6 @@
 # Hetzner Debian Setup (DEV Server)
 
-<!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=5 orderedList=true} -->
+<!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=true} -->
 
 <!-- code_chunk_output -->
 
@@ -28,8 +28,23 @@
     3. [Renewing the Certificate](#renewing-the-certificate)
     4. [SSL Certificate Management Decision](#ssl-certificate-management-decision)
     5. [Reverse Proxy for GitLab](#reverse-proxy-for-gitlab)
-        1. [Enable Apache Modules](#enable-apache-modules)
-        2. [Create Apache Directives](#create-apache-directives)
+        1. [Update GitLab to HTTP-only](#update-gitlab-to-http-only)
+        2. [Restart GitLab](#restart-gitlab)
+        3. [Enable Apache Modules](#enable-apache-modules)
+        4. [Create Apache Directives](#create-apache-directives)
+    6. [Debugging](#debugging)
+        1. [Port and Service Verification](#port-and-service-verification)
+        2. [Apache Configuration Verification](#apache-configuration-verification)
+        3. [Connectivity Testing](#connectivity-testing)
+        4. [Log Analysis](#log-analysis)
+        5. [SSL Certificate Debugging](#ssl-certificate-debugging)
+        6. [GitLab Administration](#gitlab-administration)
+        7. [Common Issues Resolution](#common-issues-resolution)
+            1. [Issue: Proxy modules not loaded](#issue-proxy-modules-not-loaded)
+            2. [Issue: Container not accessible](#issue-container-not-accessible)
+        8. [GitLab SSH Authentication Troubleshooting](#gitlab-ssh-authentication-troubleshooting)
+            1. [MacOS](#macos)
+            2. [Windows](#windows)
 
 <!-- /code_chunk_output -->
 
@@ -374,6 +389,42 @@ The trade-off involves creating a dependency on IPConfig for SSL management, but
 
 ### Reverse Proxy for GitLab
 
+#### Update GitLab to HTTP-only
+
+```yaml
+version: '3.6'
+services:
+  gitlab:
+    image: 'gitlab/gitlab-ce:latest'
+    restart: always
+    hostname: 'git.example.com'
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'https://git.example.com'
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+        nginx['proxy_set_headers'] = {
+          'X-Forwarded-Proto' => 'https',
+          'X-Forwarded-Ssl' => 'on'
+        }
+    ports:
+      - '8090:80'
+      - '2222:22'
+    volumes:
+      - '/srv/gitlab/config:/etc/gitlab'
+      - '/srv/gitlab/logs:/var/log/gitlab'
+      - '/srv/gitlab/data:/var/opt/gitlab'
+    shm_size: '256m'
+```
+
+#### Restart GitLab
+
+```bash
+cd /srv/gitlab
+docker compose down
+docker compose up -d
+```
+
 #### Enable Apache Modules
 
 ```bash
@@ -403,3 +454,180 @@ Apply/Save Changes. Then Enable SSL in the "Domain" tab (Let's Encrypt). And res
 ```bash
 systemctl restart apache2
 ```
+
+### Debugging
+
+These are the commands I used intermittently for debugging, Checking Ports, Services etc...
+
+#### Port and Service Verification
+Check if GitLab container is running and ports are exposed:
+
+```bash
+# Verify GitLab container status
+docker ps | grep gitlab
+
+# Check if port 8090 is listening
+sudo netstat -tlnp | grep 8090
+
+# Alternative command
+sudo ss -tlnp | grep 8090
+```
+
+#### Apache Configuration Verification
+Verify Apache proxy configuration:
+
+```bash
+# Check Apache status
+sudo systemctl status apache2
+
+# Test Apache configuration syntax
+sudo apache2ctl configtest
+
+# List enabled sites (should show your GitLab site)
+ls -la /etc/apache2/sites-enabled/ | grep git
+
+# View site configuration
+sudo apache2ctl -S | grep git
+
+# Enable required modules (if not already enabled)
+sudo a2enmod proxy proxy_http headers
+sudo systemctl restart apache2
+```
+
+#### Connectivity Testing
+Test HTTP connectivity at different levels:
+
+```bash
+# Test direct container access
+curl -I http://127.0.0.1:8090
+
+# Test through Apache with host header
+curl -I http://127.0.0.1 -H "Host: git.example.com"
+
+# Test external domain resolution
+curl -I http://git.example.com
+```
+
+#### Log Analysis
+Monitor logs for troubleshooting:
+
+```bash
+# GitLab container logs
+docker logs gitlab-gitlab-1 -f
+
+# Apache error logs for your domain
+tail -f /var/log/ispconfig/httpd/git.example.com/error.log
+
+# Apache service logs
+journalctl -xeu apache2.service
+```
+
+#### SSL Certificate Debugging
+Verify Let's Encrypt certificate and DNS challenges:
+
+```bash
+# Check DNS TXT record propagation
+# (replace with your actual challenge)
+dig TXT _acme-challenge.git.example.com @8.8.8.8
+dig TXT _acme-challenge.git.example.com @1.1.1.1
+
+# Manual certificate request (if automatic fails)
+certbot certonly --manual --preferred-challenges dns -d git.example.com
+```
+
+#### GitLab Administration
+Reset GitLab root password if needed:
+
+```bash
+# Interactive password reset
+docker exec -it gitlab-gitlab-1 gitlab-rake "gitlab:password:reset"
+
+# Reset specific user password
+docker exec -it gitlab-gitlab-1 gitlab-rake "gitlab:password:reset[username]"
+
+# Search logs for password-related entries
+docker logs gitlab-gitlab-1 | grep -i password
+```
+
+#### Common Issues Resolution
+Issue: Apache site not enabled
+
+```bash
+sudo a2ensite git.example.com
+sudo systemctl reload apache2
+```
+
+##### Issue: Proxy modules not loaded
+
+```bash
+sudo a2enmod proxy proxy_http headers
+sudo systemctl restart apache2
+```
+
+##### Issue: Container not accessible
+
+Verify container is running: `docker ps`
+
+Check port binding: `docker port gitlab-gitlab-1`
+
+Test direct container access: `curl http://127.0.0.1:8090`
+
+#### GitLab SSH Authentication Troubleshooting
+
+##### MacOS
+
+If you are a macOS user, ensure that your SSH key is added to the SSH agent:
+
+```bash
+# Start the SSH agent
+eval "$(ssh-agent -s)"
+
+# Add your SSH private key
+ssh-add ~/.ssh/id_ed25519
+
+# Verify
+ssh-add -l
+
+# Correct Remote (e.g. Port 2222 ist missing)
+git remote set-url origin ssh://git@git.example.com:2222/group-name/project-name.git
+
+# Test Connection
+ssh -T git@git.example.com
+
+
+# Debug SSH Connection
+ssh -v git@git.example.com
+```
+
+Also, check your SSH config file (`~/.ssh/config`) for the correct settings:
+
+```bash
+Host git.example.com
+  Port 2222 # Important
+  User git
+  IdentityFile ~/.ssh/id_ed25519 # important (not standard)
+```
+
+Test your SSH connection:
+
+```bash
+ssh -T git@git.example.com
+```
+
+If you encounter issues, check the following:
+
+- Ensure your public key is added to your GitLab account.
+- Verify the correct permissions on your SSH key files:
+
+```bash
+chmod 600 ~/.ssh/id_rsa
+chmod 644 ~/.ssh/id_rsa.pub
+```
+
+##### Windows
+
+It is recommended to use a personal access token instead of relying on SSH keys, as Windows terminals may not behave like Linux terminals and could lead to issues when using Git in the terminal. Personal access tokens provide a more consistent and reliable authentication method.
+
+- GitLab UI → User Settings → Access Tokens
+- Create token with write_repository scope
+- Use your username and the token (not password) when prompted
