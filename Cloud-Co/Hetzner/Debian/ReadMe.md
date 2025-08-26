@@ -263,6 +263,8 @@ mkdir -p /srv/gitlab/{config,data,logs}
 
 ### GitLab Docker Compose File
 
+**Important**: While the configuration provided here is correct, we use a reverse proxy setup. Refer to the relevant chapter and follow the instructions outlined there. For details on the decision-making process, see the chapter `SSL Certificate Management Decision`.
+
 Create `/srv/gitlab/docker-compose.yml` with the following content:
 
 ```yaml
