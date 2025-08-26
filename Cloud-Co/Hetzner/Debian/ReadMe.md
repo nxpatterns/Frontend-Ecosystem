@@ -45,6 +45,7 @@
         8. [GitLab SSH Authentication Troubleshooting](#gitlab-ssh-authentication-troubleshooting)
             1. [MacOS](#macos)
             2. [Windows](#windows)
+            3. [Common Solution](#common-solution)
 
 <!-- /code_chunk_output -->
 
@@ -574,6 +575,14 @@ Test direct container access: `curl http://127.0.0.1:8090`
 
 #### GitLab SSH Authentication Troubleshooting
 
+Most problems stem from using the default id_rsa key instead of id_ed25519 (wrong key generated with incorrect command), or the SSH key not being uploaded at all. During cloning, HTTPS and SSH methods are often confused - when choosing HTTPS, SSH keys have no effect. In this case, a personal access token works better. Additionally, the SSH port might be incorrectly specified, as we have port 2222 configured here instead of the default port 22, and if no port is specified, port 22 is assumed by default. In summary, the key type, authentication method, and port are the most common sources of errors.
+
+And check these too:
+
+- User permissions on the repository
+- SSH-Agent not running on Windows
+- Incorrect SSH key permissions (chmod 600)
+
 ##### MacOS
 
 If you are a macOS user, ensure that your SSH key is added to the SSH agent:
@@ -631,3 +640,27 @@ It is recommended to use a personal access token instead of relying on SSH keys,
 - GitLab UI → User Settings → Access Tokens
 - Create token with write_repository scope
 - Use your username and the token (not password) when prompted
+
+##### Common Solution
+
+Create/Update your SSH config file (`~/.ssh/config`) with the correct settings:
+
+```bash
+  HostName git.example.com
+    User git
+    Port 2222 # our configuration
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+```
+
+Clone with explicit Port (ssh://)
+
+```bash
+git clone ssh://git@git.example.com:2222/takemarco/fe.git
+```
+
+Test with the correct port:
+
+```bash
+ssh -T -p 2222 git@git.example.com
+```
