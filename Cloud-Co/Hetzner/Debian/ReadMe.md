@@ -852,6 +852,8 @@ _dmarc  IN  TXT  "v=DMARC1; p=none; ruf=mailto:dmarc@example.com"
 
 #### Gmail Compatibility
 
+Check this document: <https://support.google.com/a/answer/81126>
+
 **Key factors for Gmail acceptance**:
 
 - Gradual volume increase (start with <100 emails/day)
