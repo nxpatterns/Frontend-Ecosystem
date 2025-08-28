@@ -48,7 +48,16 @@
             3. [Common Solution](#common-solution)
 8. [Mail Server](#mail-server)
     1. [Successful Solution Steps](#successful-solution-steps)
-        1. [Port 25 Configuration](#port-25-configuration)
+        1. [Timezone Update](#timezone-update)
+        2. [Port 25 Configuration](#port-25-configuration)
+        3. [Update/Fix DNS Records](#updatefix-dns-records)
+        4. [Postfix Configuration Update](#postfix-configuration-update)
+        5. [DKIM Configuration](#dkim-configuration)
+        6. [Floating IP for Reverse DNS](#floating-ip-for-reverse-dns)
+        7. [Postfix Network Binding Configuration](#postfix-network-binding-configuration)
+        8. [IPv4 Preference for Gmail Compatibility](#ipv4-preference-for-gmail-compatibility)
+        9. [DMARC Policy Adjustment](#dmarc-policy-adjustment)
+        10. [Gmail Compatibility](#gmail-compatibility)
 
 <!-- /code_chunk_output -->
 
@@ -761,7 +770,9 @@ openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt \
 mv /tmp/converted.key /var/lib/amavis/dkim/subdomain.example.com.private
 ```
 
-4. Configure Rspamd mappings to use the DKIM keys. (Rspamd needs to know which key to use for signing emails from your domain. This is done through mapping files.)
+4. Configure Rspamd mappings to use the DKIM keys.
+
+(Rspamd needs to know which key to use for signing emails from your domain. This is done through mapping files.)
 
 Update the Rspamd mapping configuration.
 
