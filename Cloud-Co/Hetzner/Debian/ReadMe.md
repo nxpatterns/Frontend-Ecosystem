@@ -785,7 +785,7 @@ chmod 600 /var/lib/amavis/dkim/subdomain.example.com.private
 
 #### Floating IP for Reverse DNS
 
-*Purpose:* Establishes consistent IP reputation and proper reverse DNS resolution for your mail server.
+**Purpose:** Establishes consistent IP reputation and proper reverse DNS resolution for your mail server.
 
 **Why necessary:** Reverse DNS (PTR records) verification is a fundamental anti-spam check. If your server's IP address doesn't reverse-resolve to your mail server's domain, many recipients will reject your emails. Floating IPs provide stable IP addresses that can be properly configured with PTR records.
 
