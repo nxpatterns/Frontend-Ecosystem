@@ -672,19 +672,17 @@ ssh -T -p 2222 git@git.example.com
 
 ## Mail Server
 
-ISPConfig installs Postfix, Dovecot, and other necessary components for a mail server by default. You can manage email accounts, domains, and settings through the ISPConfig web interface.
+ISPConfig automatically installs Postfix, Dovecot, and other essential components for a complete mail server solution. While the web interface simplifies email account and domain management, several critical configuration challenges must be addressed to ensure reliable email delivery.
 
-But there are complications that may arise during setup and configuration, such as DNS issues, firewall settings, and email client configuration.
-
-Sending emails from a new server and ensuring they reach all recipients is not straightforward. Many mail servers reject emails from unknown servers to prevent spam. Therefore, it is crucial to configure your server correctly and set up the necessary DNS records properly.
-
-Emails could be sent (appeared in Sent folder) but never reached destination. This can happen due to various reasons, including misconfigured DNS records, lack of proper authentication (SPF, DKIM), or the receiving mail server marking the emails as spam.
+The primary challenge with any new mail server is reputation establishment. Modern mail providers employ sophisticated filtering mechanisms that automatically reject emails from unknown or improperly configured servers. This results in emails appearing in your Sent folder while never reaching their intended recipients - a deceptive scenario that can persist unnoticed for extended periods.
 
 ### Successful Solution Steps
 
 #### Timezone Update
 
-This is crucial for log analysis, as having the same timezone makes it easier to correlate sent emails with the corresponding errors.
+**Purpose:** Synchronizes server time with your local timezone to enable accurate log correlation and troubleshooting.
+
+**Why necessary:** Mail server logs use timestamps extensively. When investigating delivery failures, having consistent timezone across all components eliminates confusion when correlating sent emails with corresponding error messages in various log files.
 
 ```bash
 timedatectl set-timezone Europe/Vienna
@@ -693,15 +691,20 @@ systemctl restart postfix
 
 #### Port 25 Configuration
 
+**Purpose**: Enables your server to receive incoming emails from external mail servers and send outbound emails.
+
+**Why necessary**: Port 25 (SMTP) is the standard port for mail server communication. Cloud providers typically block this port by default to prevent spam. Without proper port 25 access, external mail servers cannot deliver emails to your server, and your server cannot establish proper SMTP connections with other mail servers.
+
 - Contact Hetzner Support for outbound Port 25 unblocking
 - Hetzner Cloud Firewall: Add Port 25 as inbound rule
   - Without firewall rule, external mail servers could not connect
+- Verify connectivity: `telnet your-server-ip 25`
 
 #### Update/Fix DNS Records
 
-- Ensure correct MX records are set up
-- Add SPF record to authorize your server
-- Set up DKIM for email signing
+**Purpose**: Establishes your server's identity and authorization to send emails for your domains.
+
+**Why necessary**: Modern email systems rely on DNS-based authentication mechanisms (SPF, DKIM, DMARC) to combat spam and phishing. Without proper DNS records, receiving mail servers will either reject your emails outright or classify them as spam.
 
 Sub-Domain Management can be very tricky:
 
@@ -713,17 +716,43 @@ subdomain.example.com IN TXT "v=spf1 mx a ip4:188.x.x.x ~all" # Adjust IP accord
 _dmarc.subdomain.example.com IN TXT "v=DMARC1; p=none; rua=mailto:dmarc@example.com"
 ```
 
+**Critical considerations**:
+
+- MX records must point to A records, never to CNAME records
+- SPF records authorize specific IP addresses to send emails for your domain
+- DMARC provides policy instructions for handling authentication failures
+
 #### Postfix Configuration Update
 
-Fix Postfix configuration and update mydestination (remove everything else, only localhost):
+**Purpose**: Configures Postfix to handle virtual domains correctly and prevent mail routing conflicts.
+
+**Why necessary**: Default Postfix installations often include the server's hostname in `mydestination`, which can cause mail routing conflicts when using virtual domains managed by ISPConfig. This misconfiguration leads to emails being processed locally instead of through the virtual domain system.
 
 ```bash
 postconf -e "mydestination = localhost, localhost.localdomain"
 ```
 
+**Verification**: Check current settings with `postconf mydestination`
+
 #### DKIM Configuration
 
-First you have to enter a Email Domain in ISPConfig and activate DKIM for this domain. After that, you need to generate the DKIM keys and add the public key to your DNS records. But before that, you need to synchronise rspamd-key-format with the format of the DKIM key generated by ISPConfig.
+**Purpose**: Implements cryptographic email signing to verify email authenticity and prevent tampering.
+
+**Why necessary**: DKIM (DomainKeys Identified Mail) provides cryptographic proof that emails originated from your server and haven't been modified in transit. Major email providers increasingly require DKIM signatures for inbox delivery.
+
+1. Enable DKIM in ISPConfig: Navigate to Email → Domain → Click DKIM button to activate DKIM for your domain. Then click "Generate new DKIM keys". Note the selector (e.g., `default`) and the generated public key.
+
+2. Add the provided TXT record to your DNS settings:
+
+```plaintext
+default._domainkey.subdomain.example.com IN TXT "v=DKIM1; k=rsa; p=YOUR_PUBLIC_KEY"
+```
+
+3. Convert ISPConfig key format for Rspamd compatibility.
+
+Unfortunately ISPConfig generates keys in a format incompatible with Rspamd, requiring conversion.
+
+If you don't do that, you will see errors in your mail log like `"cannot load dkim key"` or `"invalid key format"` like: "rspamd[xxxx]: <xxx>; dkim_sign; `cannot load dkim key` /var/lib/amavis/dkim/subdomain.example.com.private: `unsupported key format`" and "rspamd[xxxx]: <xxx>; dkim_sign; `cannot parse DKIM key`: error:0906D064:PEM routines:PEM_read_bio:bad base64 decode", etc.
 
 ```bash
 openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt \
@@ -732,7 +761,9 @@ openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt \
 mv /tmp/converted.key /var/lib/amavis/dkim/subdomain.example.com.private
 ```
 
-Then you have to update the Rspamd mapping configuration.
+4. Configure Rspamd mappings to use the DKIM keys. (Rspamd needs to know which key to use for signing emails from your domain. This is done through mapping files.)
+
+Update the Rspamd mapping configuration.
 
 ```bash
 echo "subdomain.example.com default" > /etc/rspamd/local.d/dkim_domains.map
@@ -742,6 +773,10 @@ chmod 600 /var/lib/amavis/dkim/subdomain.example.com.private
 ```
 
 #### Floating IP for Reverse DNS
+
+*Purpose:* Establishes consistent IP reputation and proper reverse DNS resolution for your mail server.
+
+**Why necessary:** Reverse DNS (PTR records) verification is a fundamental anti-spam check. If your server's IP address doesn't reverse-resolve to your mail server's domain, many recipients will reject your emails. Floating IPs provide stable IP addresses that can be properly configured with PTR records.
 
 You need a Floating IP to set up Reverse DNS (PTR record) in Hetzner Cloud. Assign the Floating IP to your server and then set the PTR record to match your mail domain. The reason for that is to ensure that the reverse DNS lookup for your mail server's IP address resolves to the correct domain name, which is important for email deliverability and to prevent your emails from being marked as spam.
 
@@ -763,9 +798,11 @@ Update your DNS A record for mail.example.com to point to the Floating IP addres
 mail.example.com IN A 88.x.x.x
 ```
 
-#### Configure Postfix Bindings
+#### Postfix Network Binding Configuration
 
-You need this configuration to ensure that Postfix binds to the correct IP address. The reason for that is to ensure that the reverse DNS lookup for your mail server's IP address resolves to the correct domain name, which is important for email deliverability and to prevent your emails from being marked as spam.
+**Purpose**: Ensures Postfix uses the correct IP address for outbound connections and presents the proper banner.
+
+**Why necessary**: When multiple IP addresses are available, Postfix must be explicitly configured to use the Floating IP for outbound connections. This ensures consistency between your DNS records and actual network behavior, which is crucial for reputation and deliverability.
 
 ```bash
 postconf -e "smtp_bind_address = 88.198.90.221"
@@ -773,25 +810,43 @@ postconf -e "smtpd_banner = mail.trybox.eu ESMTP"
 systemctl restart postfix
 ```
 
+**Verification**: Check with `postconf smtp_bind_address smtpd_banner`
+
 #### IPv4 Preference for Gmail Compatibility
 
-You shouldn't change inet_protocols to ipv4 in the Postfix configuration. This is important for compatibility with e.g. Roundcube etc. But you should change `smtp_address_preference` to ipv4. The reason for that is that some email providers, like Gmail, have issues with IPv6 connections and may reject emails sent over IPv6. By setting smtp_address_preference to ipv4, you ensure that Postfix prefers IPv4 when sending emails, which can improve deliverability to such providers.
+**Purpose**: Optimizes email delivery to providers with IPv6 connectivity issues while maintaining dual-stack compatibility.
+
+**Why necessary**: Some major email providers (notably Gmail) have inconsistent IPv6 handling that can result in connection timeouts or rejections. By preferencing IPv4 for outbound connections, you avoid these compatibility issues while still supporting IPv6 for inbound connections.
 
 ```bash
 postconf -e "smtp_address_preference = ipv4"
 systemctl reload postfix
 ```
 
-#### Relax DMARC Policy
+**Important**: Do not set `inet_protocols = ipv4` as this breaks webmail and other ISPConfig components that require IPv6 support.
 
-You can relax the DMARC policy to allow for more lenient handling of emails that fail DMARC checks. This can be useful for troubleshooting and ensuring that legitimate emails are not rejected.
+#### DMARC Policy Adjustment
+
+**Purpose**: Implements a gradual approach to DMARC enforcement during initial reputation building.
+
+**Why necessary**: New mail servers benefit from relaxed DMARC policies during the initial reputation building phase. Setting `p=none` allows you to monitor DMARC alignment issues without having legitimate emails rejected, while still collecting valuable feedback reports.
 
 ```plaintext
 _dmarc  IN  TXT  "v=DMARC1; p=none; ruf=mailto:dmarc@example.com"
 ```
 
-I've change it usually from `p=quarantine` to `p=none` to reduce strict filtering during reputation building phase. If you check your server configuration via "https://mxtoolbox.com/" it will tell you "DMARC Quarantine/Reject policy not enabled" which is not a problem, just an information.
+**Progression strategy**: Start with `p=none` → `p=quarantine` (after 2-3 months) → `p=reject` (after 6+ months of clean operation)
+
+**Testing note**: When testing your configuration via [https://mxtoolbox.com/](https://mxtoolbox.com/), you'll see "DMARC Quarantine/Reject policy not enabled" - this is informational, not an error, and is expected when using `p=none`.
 
 #### Gmail Compatibility
 
-Gmail has strict policies for accepting emails, and if your server is new or has a low reputation, Gmail may reject your emails. This rejection is reputation-based, not technical. Gmail is always a problem, but you have to live with it, because the whole world uses Gmail yet.
+**Key factors for Gmail acceptance**:
+
+- Gradual volume increase (start with <100 emails/day)
+- Consistent sending patterns and timing
+- Low complaint rates (<0.1%)
+- Proper authentication (SPF, DKIM, DMARC alignment)
+- Engagement metrics (opens, replies, forwards)
+
+**Expected timeline**: New servers typically require 4-8 weeks of consistent sending to establish sufficient reputation with Gmail's systems.
