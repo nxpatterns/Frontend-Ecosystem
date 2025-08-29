@@ -4,12 +4,15 @@
 
 <!-- code_chunk_output -->
 
-1. [Getting](#getting)
+1. [Prerequisites](#prerequisites)
+    1. [Generate a SSH Key (ed25519)](#generate-a-ssh-key-ed25519)
+        1. [Quantum Security (ToDo)](#quantum-security-todo)
 2. [Initial Setup](#initial-setup)
-    1. [Update & Upgrade](#update--upgrade)
-    2. [Manage Initial Host Name](#manage-initial-host-name)
+    1. [Create New Sudo User](#create-new-sudo-user)
+    2. [Update & Upgrade](#update--upgrade)
+    3. [Manage Initial Host Name](#manage-initial-host-name)
         1. [Verification](#verification)
-    3. [Small Bash Improvements](#small-bash-improvements)
+    4. [Small Bash Improvements](#small-bash-improvements)
 3. [Install ISPConfig](#install-ispconfig)
 4. [Secure Standard Server Domain](#secure-standard-server-domain)
     1. [Install Certbox](#install-certbox)
@@ -61,7 +64,34 @@
 
 <!-- /code_chunk_output -->
 
-## Getting
+## Prerequisites
+
+### Generate a SSH Key (ed25519)
+
+Generate a SSH Key (ed25519) on your local machine.
+
+**ed25519** is a modern and secure elliptic curve algorithm that offers better security and performance compared to older algorithms like RSA.
+
+While it is more resistant to certain attacks than older algorithms, **ed25519** could still be vulnerable to future quantum computers.
+
+```bash
+ssh-keygen -t ed25519 -C "your_email@example.com"
+```
+
+On Linux/MacOS, the default location is `~/.ssh/id_ed25519` and `~/.ssh/id_ed25519.pub`.
+
+On Windows, it might be in a different location depending on the SSH client you are using. But, most probably it will be located in `C:\Users\<YourUsername>\.ssh\id_ed25519` and `C:\Users\<YourUsername>\.ssh\id_ed25519.pub`.
+
+Never share your private key (`id_ed25519`) with anyone. The public key (`id_ed25519.pub`) is meant to be shared and added to the `~/.ssh/authorized_keys` file on the server you want to access.
+
+#### Quantum Security (ToDo)
+
+NTRU is a lattice-based cryptographic algorithm that is designed to be secure against quantum attacks. It has been implemented in various libraries, such as:
+
+- **NTRUEncrypt**: A public key encryption system based on the NTRU algorithm.
+- **NTRUSign**: A digital signature scheme based on NTRU.
+
+These implementations can be used for secure communication and data protection in a post-quantum world.
 
 ## Initial Setup
 
@@ -75,13 +105,25 @@ Important: If you want to connect with `ssh root@ip`, ensure the name of your SS
 ssh -i /path/to/your/private_key root@ip
 ```
 
+On macOS/Linux:
+
+```bash
+ssh -i ~/.ssh/id_ed25519 root@ip
+```
+
+On Windows, e.g.:
+
+```bash
+ssh -i C:\Users\<YourUsername>\.ssh\id_ed25519 root@ip
+```
+
 Better, you create a config file for SSH to simplify the connection process. Create or edit the `~/.ssh/config` file on your local machine and add the following (the indentation is important):
 
 ```plaintext
 Host your-alias-name
     HostName ip
     User root
-    IdentityFile /path/to/your/private_key
+    IdentityFile ~/.ssh/id_ed25519.pub
 ```
 
 Now you can connect with a simple command:
@@ -89,6 +131,50 @@ Now you can connect with a simple command:
 ```shell
 ssh your-alias-name
 ```
+
+### Create New Sudo User
+
+If we create a new sudo user, we don't want to give him the ability to modify/delete/.. root user. And you shouldn't use the root user for everyday tasks too.
+
+```shell
+adduser colleague-username
+usermod -aG sudo colleague-username
+```
+
+You will need first to add his public key to setup SSH access:
+
+```bash
+mkdir -p /home/colleague-username/.ssh
+echo "his-public-key-here" > /home/colleague-username/.ssh/authorized_keys
+chown -R colleague-username:colleague-username /home/colleague-username/.ssh
+chmod 700 /home/colleague-username/.ssh
+chmod 600 /home/colleague-username/.ssh/authorized_keys
+```
+
+And now you should use `visudo` (on Debian based systems) to edit the sudoers file:
+
+```bash
+visudo
+```
+
+And add the following information (before `@includedir /etc/sudoers.d`):
+
+```bash
+colleague-username ALL=(ALL:ALL) ALL, \
+    !/usr/bin/passwd root, \
+    !/usr/bin/usermod root, \
+    !/usr/bin/userdel root, \
+    !/usr/bin/chsh root, \
+    !/usr/sbin/usermod root, \
+    !/usr/sbin/userdel root, \
+    !/bin/su - root, \
+    !/usr/bin/sudo -u root, \
+    !/bin/nano /root/.ssh/*, \
+    !/bin/vi /root/.ssh/*, \
+    !/bin/vim /root/.ssh/*
+```
+
+Das ist nur am Anfang in der Einrichtungsphase des Servers notwendig, und nur dann, falls 2 Leute gleichzeitig den Server administrieren/einrichten soll. Idealerweise sollte das Rechtemanagement via Gruppenzuordnungen funktionieren und niemals personenspezifisch. Wir werden diese Gruppen in einem späteren Abschnitt dieser Dokumentation einrichten.
 
 ### Update & Upgrade
 
