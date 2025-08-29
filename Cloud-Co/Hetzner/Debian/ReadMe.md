@@ -8,59 +8,8 @@
     1. [Generate a SSH Key (ed25519)](#generate-a-ssh-key-ed25519)
         1. [Quantum Security (ToDo)](#quantum-security-todo)
 2. [Initial Setup](#initial-setup)
-    1. [Create New Sudo User](#create-new-sudo-user)
-    2. [Update & Upgrade](#update--upgrade)
-    3. [Manage Initial Host Name](#manage-initial-host-name)
-        1. [Verification](#verification)
-    4. [Small Bash Improvements](#small-bash-improvements)
-3. [Install ISPConfig](#install-ispconfig)
-4. [Secure Standard Server Domain](#secure-standard-server-domain)
-    1. [Install Certbox](#install-certbox)
-    2. [Add SSL Certificate](#add-ssl-certificate)
-    3. [Enable SSL & Restart Apache](#enable-ssl--restart-apache)
-    4. [Verification](#verification-1)
-5. [Install Docker (Secure with Key Check)](#install-docker-secure-with-key-check)
-6. [Install GitLab & GitLab Runner (via Docker)](#install-gitlab--gitlab-runner-via-docker)
-    1. [GitLab Directory Structure](#gitlab-directory-structure)
-    2. [GitLab Docker Compose File](#gitlab-docker-compose-file)
-    3. [Compose & Verify](#compose--verify)
-    4. [Initial Root Password](#initial-root-password)
-7. [GitLab Getting Started](#gitlab-getting-started)
-    1. [Initial Steps](#initial-steps)
-    2. [SSL Issues (Tricky!)](#ssl-issues-tricky)
-    3. [Renewing the Certificate](#renewing-the-certificate)
-    4. [SSL Certificate Management Decision](#ssl-certificate-management-decision)
-    5. [Reverse Proxy for GitLab](#reverse-proxy-for-gitlab)
-        1. [Update GitLab to HTTP-only](#update-gitlab-to-http-only)
-        2. [Restart GitLab](#restart-gitlab)
-        3. [Enable Apache Modules](#enable-apache-modules)
-        4. [Create Apache Directives](#create-apache-directives)
-    6. [Debugging](#debugging)
-        1. [Port and Service Verification](#port-and-service-verification)
-        2. [Apache Configuration Verification](#apache-configuration-verification)
-        3. [Connectivity Testing](#connectivity-testing)
-        4. [Log Analysis](#log-analysis)
-        5. [SSL Certificate Debugging](#ssl-certificate-debugging)
-        6. [GitLab Administration](#gitlab-administration)
-        7. [Common Issues Resolution](#common-issues-resolution)
-            1. [Issue: Proxy modules not loaded](#issue-proxy-modules-not-loaded)
-            2. [Issue: Container not accessible](#issue-container-not-accessible)
-        8. [GitLab SSH Authentication Troubleshooting](#gitlab-ssh-authentication-troubleshooting)
-            1. [MacOS](#macos)
-            2. [Windows](#windows)
-            3. [Common Solution](#common-solution)
-8. [Mail Server](#mail-server)
-    1. [Successful Solution Steps](#successful-solution-steps)
-        1. [Timezone Update](#timezone-update)
-        2. [Port 25 Configuration](#port-25-configuration)
-        3. [Update/Fix DNS Records](#updatefix-dns-records)
-        4. [Postfix Configuration Update](#postfix-configuration-update)
-        5. [DKIM Configuration](#dkim-configuration)
-        6. [Floating IP for Reverse DNS](#floating-ip-for-reverse-dns)
-        7. [Postfix Network Binding Configuration](#postfix-network-binding-configuration)
-        8. [IPv4 Preference for Gmail Compatibility](#ipv4-preference-for-gmail-compatibility)
-        9. [DMARC Policy Adjustment](#dmarc-policy-adjustment)
-        10. [Gmail Compatibility](#gmail-compatibility)
+    1. [SSH Setup](#ssh-setup)
+        1. [Verify](#verify)
 
 <!-- /code_chunk_output -->
 
@@ -76,6 +25,17 @@ While it is more resistant to certain attacks than older algorithms, **ed25519**
 
 ```bash
 ssh-keygen -t ed25519 -C "your_email@example.com"
+```
+
+OpenSSH client (incl. ssh-keygen) is included by default since Windows 10 version 1809 (2018).If not available, install via Windows Features:
+
+Settings → Apps → Optional Features → Add Feature
+Search "OpenSSH Client" → Install
+
+Or via PowerShell (as admin):
+
+```powershell
+Add-WindowsCapability -Online -Name OpenSSH.Client*
 ```
 
 On Linux/MacOS, the default location is `~/.ssh/id_ed25519` and `~/.ssh/id_ed25519.pub`.
@@ -94,6 +54,8 @@ NTRU is a lattice-based cryptographic algorithm that is designed to be secure ag
 These implementations can be used for secure communication and data protection in a post-quantum world.
 
 ## Initial Setup
+
+### SSH Setup
 
 Create the server using the Hetzner Cloud Console. Choose the desired specifications, including the image (Debian), server type, and location.
 
@@ -132,9 +94,40 @@ Now you can connect with a simple command:
 ssh your-alias-name
 ```
 
+#### Verify
+
+```shell
+# On server, check the key is in authorized_keys
+cat /root/.ssh/authorized_keys
+````
+
+On your local machine, check:
+
+```shell
+cat ~/.ssh/config
+ls -la ~/.ssh/id_ed25519*
+cat ~/.ssh/id_ed25519.pub
+```
+
+Compare the two public keys (on server and local machine) to ensure they match, that means the content of `id_ed25519.pub` with the entered key in `/root/.ssh/authorized_keys`.
+
+Test SSH Key authentication manually:
+
+```bash
+ssh -i ~/.ssh/id_ed25519 -v root@ip
+```
+
+The `-v` flag shows verbose output - you'll see if it's trying the key or not.
+
+**Common issues**:
+
+- Public key not added to server's `authorized_keys`
+- Wrong permissions on key files
+- Wrong key path in config
+
 ### Create New Sudo User
 
-If we create a new sudo user, we don't want to give him the ability to modify/delete/.. root user. And you shouldn't use the root user for everyday tasks too.
+If we create a new sudo user, we don't want to give him the ability to modify/delete/.. `root` user. And you shouldn't use the `root` user for everyday tasks too.
 
 ```shell
 adduser colleague-username
@@ -174,11 +167,59 @@ colleague-username ALL=(ALL:ALL) ALL, \
     !/bin/vim /root/.ssh/*
 ```
 
-Das ist nur am Anfang in der Einrichtungsphase des Servers notwendig, und nur dann, falls 2 Leute gleichzeitig den Server administrieren/einrichten soll. Idealerweise sollte das Rechtemanagement via Gruppenzuordnungen funktionieren und niemals personenspezifisch. Wir werden diese Gruppen in einem späteren Abschnitt dieser Dokumentation einrichten.
+**Important:** This is only necessary during the initial server setup phase and only if two people need to administer/setup the server simultaneously. Ideally, permission management should be handled via group assignments and never on an individual basis. We will configure these groups in a later section of this documentation.
+
+#### Verify
+
+Check Syntax:
+
+```bash
+visudo -c
+```
+
+Switch to the new user:
+
+```bash
+su - colleague-username
+# Check sudo permissions generally
+sudo -l
+# Check sudo permissions for specific user
+sudo -U colleague-username -l
+```
+
+and try allowed and not allowed commands:
+
+```bash
+sudo apt update                       # OK
+sudo systemctl status ssh             # OK
+sudo passwd root                      # NOT OK
+sudo nano /root/.ssh/authorized_keys  # NOT OK
+```
+
+Change back to the root user:
+
+```bash
+su - # or
+exit
+# Alternative if exit doesn't work
+logout
+```
+
+If you want to add special configuration to `/etc/ssh/sshd_config`, you can do so by editing the file:
+
+```bash
+nano /etc/ssh/sshd_config
+```
+
+Afterward, restart the SSH service:
+
+```bash
+systemctl restart sshd
+```
 
 ### Update & Upgrade
 
-```shell
+```bash
 apt update && apt upgrade -y
 ```
 
