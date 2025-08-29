@@ -10,6 +10,61 @@
 2. [Initial Setup](#initial-setup)
     1. [SSH Setup](#ssh-setup)
         1. [Verify](#verify)
+    2. [Create New Sudo User](#create-new-sudo-user)
+        1. [Verify](#verify-1)
+    3. [Update & Upgrade](#update--upgrade)
+    4. [Manage Initial Host Name](#manage-initial-host-name)
+        1. [Verification](#verification)
+    5. [Small Bash Improvements](#small-bash-improvements)
+3. [Install ISPConfig](#install-ispconfig)
+4. [Secure Standard Server Domain](#secure-standard-server-domain)
+    1. [Install Certbox](#install-certbox)
+    2. [Add SSL Certificate](#add-ssl-certificate)
+    3. [Enable SSL & Restart Apache](#enable-ssl--restart-apache)
+    4. [Verification](#verification-1)
+5. [Install Docker (Secure with Key Check)](#install-docker-secure-with-key-check)
+6. [Install GitLab & GitLab Runner (via Docker)](#install-gitlab--gitlab-runner-via-docker)
+    1. [GitLab Directory Structure](#gitlab-directory-structure)
+    2. [GitLab Docker Compose File](#gitlab-docker-compose-file)
+    3. [Compose & Verify](#compose--verify)
+    4. [Initial Root Password](#initial-root-password)
+7. [GitLab Getting Started](#gitlab-getting-started)
+    1. [Initial Steps](#initial-steps)
+    2. [SSL Issues (Tricky!)](#ssl-issues-tricky)
+    3. [Renewing the Certificate](#renewing-the-certificate)
+    4. [SSL Certificate Management Decision](#ssl-certificate-management-decision)
+    5. [Reverse Proxy for GitLab](#reverse-proxy-for-gitlab)
+        1. [Update GitLab to HTTP-only](#update-gitlab-to-http-only)
+        2. [Restart GitLab](#restart-gitlab)
+        3. [Enable Apache Modules](#enable-apache-modules)
+        4. [Create Apache Directives](#create-apache-directives)
+    6. [Debugging](#debugging)
+        1. [Port and Service Verification](#port-and-service-verification)
+        2. [Apache Configuration Verification](#apache-configuration-verification)
+        3. [Connectivity Testing](#connectivity-testing)
+        4. [Log Analysis](#log-analysis)
+        5. [SSL Certificate Debugging](#ssl-certificate-debugging)
+        6. [GitLab Administration](#gitlab-administration)
+        7. [Common Issues Resolution](#common-issues-resolution)
+            1. [Issue: Proxy modules not loaded](#issue-proxy-modules-not-loaded)
+            2. [Issue: Container not accessible](#issue-container-not-accessible)
+        8. [GitLab SSH Authentication Troubleshooting](#gitlab-ssh-authentication-troubleshooting)
+            1. [MacOS](#macos)
+            2. [Windows](#windows)
+            3. [Common Solution](#common-solution)
+8. [Mail Server](#mail-server)
+    1. [Successful Solution Steps](#successful-solution-steps)
+        1. [Timezone Update](#timezone-update)
+        2. [Port 25 Configuration](#port-25-configuration)
+        3. [Update/Fix DNS Records](#updatefix-dns-records)
+        4. [Postfix Configuration Update](#postfix-configuration-update)
+        5. [DKIM Configuration](#dkim-configuration)
+        6. [Floating IP for Reverse DNS](#floating-ip-for-reverse-dns)
+        7. [Postfix Network Binding Configuration](#postfix-network-binding-configuration)
+        8. [IPv4 Preference for Gmail Compatibility](#ipv4-preference-for-gmail-compatibility)
+        9. [DMARC Policy Adjustment](#dmarc-policy-adjustment)
+        10. [Gmail Compatibility](#gmail-compatibility)
+9. [GitLab Mailer Configuration](#gitlab-mailer-configuration)
 
 <!-- /code_chunk_output -->
 
@@ -99,7 +154,7 @@ ssh your-alias-name
 ```shell
 # On server, check the key is in authorized_keys
 cat /root/.ssh/authorized_keys
-````
+```
 
 On your local machine, check:
 
@@ -990,3 +1045,24 @@ Check this document: <https://support.google.com/a/answer/81126>
 - Engagement metrics (opens, replies, forwards)
 
 **Expected timeline**: New servers typically require 4-8 weeks of consistent sending to establish sufficient reputation with Gmail's systems.
+
+## GitLab Mailer Configuration
+
+We need to update out yaml-file, but before that, we need to create a secure password for the standard gitlab email address.
+
+There most simple ways:
+
+1. Via OpenSSL
+
+```bash
+openssl rand -base64 32 # or
+openssl rand -hex 24
+```
+
+2. Via pwgen
+
+```bash
+apt install pwgen
+pwgen -s 32 1 # 32 chars, secure mode, 1 pwd
+pwgen -cny 32 1   # -c = capitals, -n = numbers, -y = symbols
+```
