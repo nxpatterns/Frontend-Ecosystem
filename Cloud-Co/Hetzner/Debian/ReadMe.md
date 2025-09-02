@@ -1050,19 +1050,12 @@ Check this document: <https://support.google.com/a/answer/81126>
 
 We need to update out yaml-file, but before that, we need to create a secure password for the standard gitlab email address.
 
-There most simple ways:
-
-1. Via OpenSSL
+Use
 
 ```bash
-openssl rand -base64 32 # or
-openssl rand -hex 24
-```
-
-2. Via pwgen
-
-```bash
-apt install pwgen
-pwgen -s 32 1 # 32 chars, secure mode, 1 pwd
-pwgen -cny 32 1   # -c = capitals, -n = numbers, -y = symbols
+# Linux (e.g. Debian)
+tr -dc 'A-Za-z0-9@#$%^&*()_+=,;' < /dev/urandom | head -c 32
+# macOS
+# Set locale to C (treats bytes as raw)
+LC_ALL=C tr -dc 'A-Za-z0-9@#$%^&*()_+=,;' < /dev/urandom | head -c 32
 ```
