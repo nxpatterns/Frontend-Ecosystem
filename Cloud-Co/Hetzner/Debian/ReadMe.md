@@ -65,6 +65,10 @@
         9. [DMARC Policy Adjustment](#dmarc-policy-adjustment)
         10. [Gmail Compatibility](#gmail-compatibility)
 9. [GitLab Mailer Configuration](#gitlab-mailer-configuration)
+    1. [Generate a Secure Password](#generate-a-secure-password)
+    2. [Stop running GitLab Container](#stop-running-gitlab-container)
+    3. [Initialise Git Swarm](#initialise-git-swarm)
+    4. [Update GitLab Docker Compose File](#update-gitlab-docker-compose-file)
 
 <!-- /code_chunk_output -->
 
@@ -999,7 +1003,7 @@ mail.example.com IN A 88.x.x.x
 
 ```bash
 postconf -e "smtp_bind_address = 88.198.90.221"
-postconf -e "smtpd_banner = mail.trybox.eu ESMTP"
+postconf -e "smtpd_banner = mail.example.com ESMTP"
 systemctl restart postfix
 ```
 
@@ -1048,6 +1052,8 @@ Check this document: <https://support.google.com/a/answer/81126>
 
 ## GitLab Mailer Configuration
 
+### Generate a Secure Password
+
 We need to update out yaml-file, but before that, we need to create a secure password for the standard gitlab email address.
 
 Use
@@ -1059,3 +1065,146 @@ tr -dc 'A-Za-z0-9@#$%^&*()_+=,;' < /dev/urandom | head -c 32
 # Set locale to C (treats bytes as raw)
 LC_ALL=C tr -dc 'A-Za-z0-9@#$%^&*()_+=,;' < /dev/urandom | head -c 32
 ```
+
+### Stop running GitLab Container
+
+```bash
+cd /srv/gitlab
+docker-compose down
+```
+
+### Initialise Git Swarm
+
+We're floating between IPs like a digital nomad (See Float IP Section above). Docker Swarm needs commitment - pick the IP that serves your actual workload.
+
+```bash
+docker swarm init # or
+docker swarm init --advertise-addr your-server-ip
+```
+
+You will get an answer like this one:
+
+```bash
+# Swarm initialized: current node (xxxxxx) is now a manager.
+# To add a worker to this swarm, run the following command:
+docker swarm join --token <token> <manager-ip>:2377
+# To add a manager to this swarm, run
+docker swarm join-token manager
+# and follow the instructions.
+```
+
+### Create a Docker Secret
+
+```bash
+echo "your-smtp-password" | docker secret create gitlab_mygroup_smtp_password -
+```
+
+### Update GitLab Docker Compose File
+
+Add the following information (a real example is gitignored):
+
+```yaml
+services:
+  gitlab:
+    image: 'gitlab/gitlab-ce:latest'
+    hostname: 'git.example.com'
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      resources:
+        reservations:
+          memory: 512MB
+        limits:
+          memory: 4G
+    secrets:
+      - gitlab_mygroup_smtp_password
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'https://git.example.com'
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+        nginx['proxy_set_headers'] = {
+          'X-Forwarded-Proto' => 'https',
+          'X-Forwarded-Ssl' => 'on'
+        }
+        gitlab_rails['smtp_enable'] = true
+        gitlab_rails['smtp_address'] = "mail.example.com"
+        gitlab_rails['smtp_port'] = 25
+        gitlab_rails['smtp_domain'] = "git.mygroup.example.com"
+        gitlab_rails['gitlab_email_from'] = 'gitlab@mygroup.example.com'
+        gitlab_rails['gitlab_email_display_name'] = 'GitLab MyGroup'
+        gitlab_rails['smtp_user_name'] = 'gitlab@mygroup.example.com'
+        gitlab_rails['smtp_password'] = File.read('/run/secrets/gitlab_mygroup_smtp_password').strip
+        gitlab_rails['smtp_authentication'] = 'login'
+        gitlab_rails['smtp_enable_starttls_auto'] = true
+        gitlab_rails['smtp_tls'] = false
+    ports:
+      - '8090:80'
+      - '2222:22'
+    volumes:
+      - '/srv/gitlab/config:/etc/gitlab'
+      - '/srv/gitlab/logs:/var/log/gitlab'
+      - '/srv/gitlab/data:/var/opt/gitlab'
+    networks:
+      - gitlab-net
+secrets:
+  gitlab_mygroup_smtp_password:
+    external: true
+networks:
+  gitlab-net:
+    driver: overlay
+```
+
+### Deploy the Stack
+
+```bash
+cd /srv/gitlab
+docker stack deploy -c docker-compose.yml gitlab-stack
+```
+
+If you want to change anything, you can re-deploy anytime, without down time:
+
+```bash
+cd /srv/gitlab
+docker stack deploy -c docker-compose.yml gitlab-stack
+```
+
+### Verification
+
+```bash
+cd /srv/gitlab
+docker service logs gitlab-stack_gitlab
+docker stack ps gitlab-stack
+docker service ls
+```
+
+**Next Actions:**
+
+1. Wait ~2-3 minutes for GitLab initialization
+2. Check service health: `docker service ls`
+3. Test access: `https://git.takemarco.trybox.eu`
+
+**Secret Status Check:**
+
+```bash
+docker secret ls
+```
+
+Your SMTP password now lives encrypted in swarm's vault, not filesystem. Mission accomplished - secure mail configuration deployed! 🚀
+
+**The Beauty:** Stack deploy performs surgical updates, not demolition. Like a pit crew changing tires while the car's still racing - seamless, zero-downtime evolution.
+
+**What Happens:**
+
+- Compares current vs. desired state
+- Updates only changed configurations
+- Maintains service continuity
+- No manual stopping required
+
+**Stack vs. Compose Philosophy:**
+
+- Compose: "Tear down, rebuild" (destructive)
+- Stack: "Evolve gracefully" (surgical)
+
+Your GitLab keeps humming while configuration morphs underneath. Enterprise-grade deployment without the enterprise-grade headaches!
