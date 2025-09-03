@@ -1114,9 +1114,9 @@ services:
         condition: any
       resources:
         reservations:
-          memory: 512MB
-        limits:
           memory: 4G
+        limits:
+          memory: 8G
     secrets:
       - gitlab_mygroup_smtp_password
     environment:
@@ -1130,15 +1130,15 @@ services:
         }
         gitlab_rails['smtp_enable'] = true
         gitlab_rails['smtp_address'] = "mail.example.com"
-        gitlab_rails['smtp_port'] = 25
         gitlab_rails['smtp_domain'] = "git.mygroup.example.com"
         gitlab_rails['gitlab_email_from'] = 'gitlab@mygroup.example.com'
         gitlab_rails['gitlab_email_display_name'] = 'GitLab MyGroup'
         gitlab_rails['smtp_user_name'] = 'gitlab@mygroup.example.com'
         gitlab_rails['smtp_password'] = File.read('/run/secrets/gitlab_mygroup_smtp_password').strip
         gitlab_rails['smtp_authentication'] = 'login'
-        gitlab_rails['smtp_enable_starttls_auto'] = true
+        gitlab_rails['smtp_enable_starttls_auto'] = false
         gitlab_rails['smtp_tls'] = false
+        gitlab_rails['smtp_port'] = 25
     ports:
       - '8090:80'
       - '2222:22'
@@ -1170,13 +1170,86 @@ cd /srv/gitlab
 docker stack deploy -c docker-compose.yml gitlab-stack
 ```
 
-### Verification
+### Modifying Secrets
+
+If you want to change e.g. one of your secrets:
+
+```bash
+docker stack rm gitlab-stack
+docker secret rm gitlab_mygroup_smtp_password
+docker stack deploy -c docker-compose.yml gitlab-stack
+```
+
+### Verification & Trouble Shooting
+
+Check GitLab Container Network
+
+```bash
+docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab) ip route show default
+```
+
+Add Docker Networks to rspamd:
+
+```bash
+nano /etc/rspamd/local.d/dkim_signing.conf
+```
+
+Update sign_networks line and Use /12 for future-proofing:
+
+```bash
+sign_networks = ["127.0.0.1/32", "::1/128", "192.168.0.0/16", "172.16.0.0/12", "10.0.0.0/8"];
+```
+
+Restart Rspamd
+
+```bash
+systemctl restart rspamd
+```
+
+Check Logs, Stack and Services
 
 ```bash
 cd /srv/gitlab
 docker service logs gitlab-stack_gitlab
 docker stack ps gitlab-stack
 docker service ls
+```
+
+If you have to change some values afterwards, it is better to reconfigure GitLab after the stack deploy:
+
+```bash
+docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab) gitlab-ctl reconfigure
+```
+
+Sometimes old configurations may stay in cache longer. If you encounter issues, consider to stop and re-configure and start anew completely:
+
+```bash
+docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab) gitlab-ctl stop
+docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab) gitlab-ctl reconfigure
+```
+
+Start all GitLab services and wait 3-5 minutes:
+
+```bash
+docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab) gitlab-ctl start
+```
+
+And sometimes, you have to force a complete container restart to ensure that all environment variables are reloaded properly:
+
+```bash
+docker service update --force gitlab-stack_gitlab
+```
+
+First, let's check the current status of all GitLab services to understand, what's running and what isn't:
+
+```bash
+docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab) gitlab-ctl status
+```
+
+And re-check if the configuration changes have taken effect:
+
+```bash
+docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab) gitlab-rails runner "puts ActionMailer::Base.smtp_settings"
 ```
 
 **Next Actions:**
@@ -1189,6 +1262,46 @@ docker service ls
 
 ```bash
 docker secret ls
+```
+
+Now we want to send an email via GitLab. Use better the GitLab Rails Console for that:
+
+```bash
+docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab) gitlab-rails console
+```
+
+It may take some time, and you will see something like that:
+
+```bash
+/srv/gitlab# docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab) gitlab-rails console
+-------------------------------------------
+ Ruby:         ruby 3.2.8 (2025-03-26 revision 13f495dc2c) [x86_64-linux]
+ GitLab:       18.3.1 (bccd1993b5d) FOSS
+ GitLab Shell: 14.44.0
+ PostgreSQL:   16.8
+-----------------------[ booted in 30.38s ]
+Loading production environment (Rails 7.1.5.1)
+irb(main):001>
+
+```
+
+Now try to send an email:
+
+```bash
+Notify.test_email('some@example.com', 'Test Subject', 'Test Body').deliver_now
+```
+
+or direct to <test@mail-tester.com>, it gives spam score + shows if DKIM passes:
+
+```bash
+Notify.test_email('test@mail-tester.com', 'DKIM Test', 'Testing DKIM signing').deliver_now
+
+```
+
+Better go to the homepage <mail-tester.com> and use a given email address for testing. You will get a score and detailed information about your mail configuration, e.g.
+
+```bash
+Notify.test_email('test-1d21kieqr@srv1.mail-tester.com', 'DKIM Test', 'Testing DKIM signing').deliver_now
 ```
 
 Your SMTP password now lives encrypted in swarm's vault, not filesystem. Mission accomplished - secure mail configuration deployed! 🚀
