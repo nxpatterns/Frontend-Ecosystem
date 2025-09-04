@@ -1374,12 +1374,26 @@ docker exec $(docker ps -q -f name=gitlab-runner) gitlab-runner register \
   --docker-pull-policy if-not-present \
   --non-interactive \
   --url http://gitlab-stack_gitlab \
-  --registration-token glrt-... \ # your token here
+  --registration-token glrt-XloTCecLzNWxNcWcRRDram86MQp0OjEKdTp6Cw.01.120b21qwi \
   --executor docker \
   --docker-image docker:24-cli \
   --docker-volumes /var/run/docker.sock:/var/run/docker.sock \
   --tag-list "docker,deployment" \
   --description "Docker Runner"
+```
+
+you will get the info:
+
+```bash
+Runtime platform                                    arch=amd64 os=linux pid=104 revision=9ba718cd version=18.3.0
+Running in system-mode.
+
+WARNING: A runner with this system ID and token has already been registered.
+WARNING: You have specified an authentication token in the legacy parameter --registration-token. This has triggered the 'legacy-compatible registration process' which has resulted in the following command line parameters being ignored: --locked, --access-level, --run-untagged, --maximum-timeout, --paused, --tag-list, and --maintenance-note. For more information, see https://docs.gitlab.com/ci/runners/new_creation_workflow/#changes-to-the-gitlab-runner-register-command-syntaxThese parameters and the legacy-compatible registration process will be removed in a future GitLab Runner release.
+Verifying runner... is valid                        correlation_id=01K4ACF9BMMGC88RYT8PKEAK2T runner=XloTCecLz
+Runner registered successfully. Feel free to start it, but if it's running already the config should be automatically reloaded!
+
+Configuration (with the authentication token) was saved in "/etc/gitlab-runner/config.toml"
 ```
 
 ### Restart Runner Container
