@@ -23,7 +23,7 @@
     3. [Enable SSL & Restart Apache](#enable-ssl--restart-apache)
     4. [Verification](#verification-1)
 5. [Install Docker (Secure with Key Check)](#install-docker-secure-with-key-check)
-6. [Install GitLab & GitLab Runner (via Docker)](#install-gitlab--gitlab-runner-via-docker)
+6. [Install GitLab (via Docker)](#install-gitlab-via-docker)
     1. [GitLab Directory Structure](#gitlab-directory-structure)
     2. [GitLab Docker Compose File](#gitlab-docker-compose-file)
     3. [Compose & Verify](#compose--verify)
@@ -68,7 +68,26 @@
     1. [Generate a Secure Password](#generate-a-secure-password)
     2. [Stop running GitLab Container](#stop-running-gitlab-container)
     3. [Initialise Git Swarm](#initialise-git-swarm)
-    4. [Update GitLab Docker Compose File](#update-gitlab-docker-compose-file)
+    4. [Create a Docker Secret](#create-a-docker-secret)
+    5. [Update GitLab Docker Compose File](#update-gitlab-docker-compose-file)
+    6. [Deploy the Stack](#deploy-the-stack)
+    7. [Modifying Secrets](#modifying-secrets)
+    8. [Verification & Trouble Shooting](#verification--trouble-shooting)
+        1. [Check GitLab Container Network](#check-gitlab-container-network)
+        2. [Add Docker Networks to `rspamd`](#add-docker-networks-to-rspamd)
+        3. [Check Logs, Stack and Services](#check-logs-stack-and-services)
+        4. [Re-Configure GitLab](#re-configure-gitlab)
+        5. [Start GitLab Services](#start-gitlab-services)
+        6. [Force Update](#force-update)
+        7. [Secret Status Check](#secret-status-check)
+        8. [Test Email Sending via GitLab Rails Console](#test-email-sending-via-gitlab-rails-console)
+        9. [Conclusion](#conclusion)
+10. [GitLab Runner](#gitlab-runner)
+    1. [Create or Get Runner Token](#create-or-get-runner-token)
+    2. [Register the Runner (Internal Service URL)](#register-the-runner-internal-service-url)
+    3. [Restart Runner Container](#restart-runner-container)
+    4. [Check Runner Container Logs](#check-runner-container-logs)
+    5. [Verify runner connection in GitLab UI:](#verify-runner-connection-in-gitlab-ui)
 
 <!-- /code_chunk_output -->
 
@@ -451,7 +470,7 @@ systemctl enable docker
 systemctl start docker
 ```
 
-## Install GitLab & GitLab Runner (via Docker)
+## Install GitLab (via Docker)
 
 ### GitLab Directory Structure
 
@@ -1182,13 +1201,13 @@ docker stack deploy -c docker-compose.yml gitlab-stack
 
 ### Verification & Trouble Shooting
 
-Check GitLab Container Network
+#### Check GitLab Container Network
 
 ```bash
 docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab) ip route show default
 ```
 
-Add Docker Networks to rspamd:
+#### Add Docker Networks to `rspamd`
 
 ```bash
 nano /etc/rspamd/local.d/dkim_signing.conf
@@ -1206,7 +1225,7 @@ Restart Rspamd
 systemctl restart rspamd
 ```
 
-Check Logs, Stack and Services
+#### Check Logs, Stack and Services
 
 ```bash
 cd /srv/gitlab
@@ -1214,6 +1233,8 @@ docker service logs gitlab-stack_gitlab
 docker stack ps gitlab-stack
 docker service ls
 ```
+
+#### Re-Configure GitLab
 
 If you have to change some values afterwards, it is better to reconfigure GitLab after the stack deploy:
 
@@ -1228,11 +1249,15 @@ docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab) gitlab-ctl stop
 docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab) gitlab-ctl reconfigure
 ```
 
+#### Start GitLab Services
+
 Start all GitLab services and wait 3-5 minutes:
 
 ```bash
 docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab) gitlab-ctl start
 ```
+
+#### Force Update
 
 And sometimes, you have to force a complete container restart to ensure that all environment variables are reloaded properly:
 
@@ -1258,11 +1283,13 @@ docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab) gitlab-rails runner 
 2. Check service health: `docker service ls`
 3. Test access: `https://git.takemarco.trybox.eu`
 
-**Secret Status Check:**
+#### Secret Status Check
 
 ```bash
 docker secret ls
 ```
+
+#### Test Email Sending via GitLab Rails Console
 
 Now we want to send an email via GitLab. Use better the GitLab Rails Console for that:
 
@@ -1304,6 +1331,8 @@ Better go to the homepage <mail-tester.com> and use a given email address for te
 Notify.test_email('test-1d21kieqr@srv1.mail-tester.com', 'DKIM Test', 'Testing DKIM signing').deliver_now
 ```
 
+#### Conclusion
+
 Your SMTP password now lives encrypted in swarm's vault, not filesystem. Mission accomplished - secure mail configuration deployed! 🚀
 
 **The Beauty:** Stack deploy performs surgical updates, not demolition. Like a pit crew changing tires while the car's still racing - seamless, zero-downtime evolution.
@@ -1321,3 +1350,73 @@ Your SMTP password now lives encrypted in swarm's vault, not filesystem. Mission
 - Stack: "Evolve gracefully" (surgical)
 
 Your GitLab keeps humming while configuration morphs underneath. Enterprise-grade deployment without the enterprise-grade headaches!
+
+## GitLab Runner
+
+### Create or Get Runner Token
+
+First you need a token. Go to <https://git.yourdomain.com/admin/runners> and check if you already have a runner registered. If not, create one by clicking the "Create Instance Runner" button.
+
+Description could be: `MyGroup GitLab Runner`, and tags could be: `docker, linux, deployment, ...` (comma-separated). This step typically involves multiple actions, but for now, we only need the first one. Once we obtain the token, we will handle the remaining steps manually via the command line. Fill the fields, select `Runs untagged jobs` and `Lock to current projects`, then click the `Create Runner` button. Your token will be shown up for a limited time, with the info:
+
+> The **runner authentication token** `glrt-WKw...` displays here **for a short time only**. After you register the runner, this token is stored in the `config.toml` and cannot be accessed again from the UI.
+
+Now you can cancel the following steps and navigate back to `/admin/runners`. You will see your newly created runner, with the info `Last contacted: Never contacted`.
+
+### Register the Runner (Internal Service URL)
+
+Run the registration command that connects our Docker container to GitLab (using the internal service URL):
+
+```bash
+docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab-runner) \
+  gitlab-runner register \
+  --url http://gitlab-stack_gitlab \
+  --token glrt-WKw3...  \ # replace with your tokenp
+  --executor shell
+```
+
+When you run this command, it will open an interactive session where GitLab Runner asks you several configuration questions. Here are the typical prompts and how to respond:
+
+```bash
+Enter the GitLab instance URL: [http://gitlab-stack_gitlab]:
+Verifying runner... is valid  correlation_id=01K4... runner=e2Di...
+Enter a name for the runner. This is stored only in the local config.toml file:
+[b1a5984842ce]: GitLab MyGroup Deployment Runner
+Enter an executor: custom, shell, ssh, parallels, virtualbox, docker, instance, docker-windows, docker+machine, kubernetes, docker-autoscaler:
+[shell]:
+Runner registered successfully. Feel free to start it, but if it's running already the config should be automatically reloaded!
+
+Configuration (with the authentication token) was saved in "/etc/gitlab-runner/config.toml"
+```
+
+### Restart Runner Container
+
+```bash
+# Restart runner container to eliminate startup timing issues
+docker service update --force gitlab-stack_gitlab-runner
+
+gitlab-stack_gitlab-runner
+overall progress: 1 out of 1 tasks
+1/1: running   [==================================================>]
+verify: Service gitlab-stack_gitlab-runner converged
+```
+
+### Check Runner Container Logs
+
+```bash
+docker logs $(docker ps -q -f name=gitlab-stack_gitlab-runner)
+
+Runtime platform                                    arch=amd64 os=linux pid=7 revision=9ba718cd version=18.3.0
+Starting multi-runner from /etc/gitlab-runner/config.toml...  builds=0 max_builds=0
+Running in system-mode.
+
+Usage logger disabled                               builds=0 max_builds=1
+Configuration loaded                                builds=0 max_builds=1
+listen_address not defined, metrics & debug endpoints disabled  builds=0 max_builds=1
+[session_server].listen_address not defined, session endpoints disabled  builds=0 max_builds=1
+Initializing executor providers                     builds=0 max_builds=1
+```
+
+### Verify runner connection in GitLab UI:
+
+Check <https://git.takemarco.trybox.eu/admin/runners> The status should now display "online" with a green indicator instead of "never contacted."
