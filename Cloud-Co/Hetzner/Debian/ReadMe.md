@@ -88,6 +88,8 @@
     3. [Restart Runner Container](#restart-runner-container)
     4. [Check Runner Container Logs](#check-runner-container-logs)
     5. [Verify runner connection in GitLab UI:](#verify-runner-connection-in-gitlab-ui)
+    6. [Trouble Shooting](#trouble-shooting)
+        1. [Several Runner Instances](#several-runner-instances)
 
 <!-- /code_chunk_output -->
 
@@ -1365,35 +1367,27 @@ Now you can cancel the following steps and navigate back to `/admin/runners`. Yo
 
 ### Register the Runner (Internal Service URL)
 
-Run the registration command that connects our Docker container to GitLab (using the internal service URL):
+Run the registration command that connects our Docker container to GitLab (using the internal service URL). Dieser Ansatz klappt nicht, aber der nächste unten:
 
 ```bash
-docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab-runner) \
-  gitlab-runner register \
+docker exec $(docker ps -q -f name=gitlab-runner) gitlab-runner register \
+  --docker-pull-policy if-not-present \
+  --non-interactive \
   --url http://gitlab-stack_gitlab \
-  --token glrt-WKw3...  \ # replace with your tokenp
-  --executor shell
-```
-
-When you run this command, it will open an interactive session where GitLab Runner asks you several configuration questions. Here are the typical prompts and how to respond:
-
-```bash
-Enter the GitLab instance URL: [http://gitlab-stack_gitlab]:
-Verifying runner... is valid  correlation_id=01K4... runner=e2Di...
-Enter a name for the runner. This is stored only in the local config.toml file:
-[b1a5984842ce]: GitLab MyGroup Deployment Runner
-Enter an executor: custom, shell, ssh, parallels, virtualbox, docker, instance, docker-windows, docker+machine, kubernetes, docker-autoscaler:
-[shell]:
-Runner registered successfully. Feel free to start it, but if it's running already the config should be automatically reloaded!
-
-Configuration (with the authentication token) was saved in "/etc/gitlab-runner/config.toml"
+  --registration-token glrt-... \ # your token here
+  --executor docker \
+  --docker-image docker:24-cli \
+  --docker-volumes /var/run/docker.sock:/var/run/docker.sock \
+  --tag-list "docker,deployment" \
+  --description "Docker Runner"
 ```
 
 ### Restart Runner Container
 
 ```bash
 # Restart runner container to eliminate startup timing issues
-docker service update --force gitlab-stack_gitlab-runner
+docker service update --force gitlab-stack_gitlab-runner # or
+docker restart $(docker ps -q -f name=gitlab-stack_gitlab-runner)
 
 gitlab-stack_gitlab-runner
 overall progress: 1 out of 1 tasks
@@ -1420,3 +1414,46 @@ Initializing executor providers                     builds=0 max_builds=1
 ### Verify runner connection in GitLab UI:
 
 Check <https://git.takemarco.trybox.eu/admin/runners> The status should now display "online" with a green indicator instead of "never contacted."
+
+### Trouble Shooting
+
+#### Several Runner Instances
+
+Manchmal laufen mehrere Runner, und der Befehl:
+
+```bash
+docker exec -it $(docker ps -q -f name=gitlab-stack_gitlab) # ... what ever
+```
+
+kann nicht aufgerufen werden. Man bekommt den Fehler:
+
+```bash
+OCI runtime exec failed: exec failed: unable to start container process: exec: "24e7ef6e3e75": executable file not found in $PATH: unknown
+```
+
+Überprüfe ob das wirklich der Fall ist:
+
+```bash
+docker ps --filter name=gitlab-stack --format "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}"
+```
+
+In dem Fall, hilft:
+
+```bash
+cd /src/gitlab
+
+# Alle Container zeigen
+docker ps --filter name=gitlab-stack
+
+# Stack komplett entfernen
+docker stack rm gitlab-stack
+
+# Warten bis alles weg ist
+docker ps --filter name=gitlab-stack
+
+# Alte Container manual entfernen falls nötig
+docker container prune -f
+
+# Stack erneut deployen
+docker stack deploy -c docker-compose.yml gitlab-stack
+```
