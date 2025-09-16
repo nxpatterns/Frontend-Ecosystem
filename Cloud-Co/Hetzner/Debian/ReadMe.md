@@ -387,6 +387,8 @@ source ~/.bashrc
 
 ## Install ISPConfig
 
+Do not create another folder, it must be `/root`.
+
 ```shell
 wget -O ispconfig3-install.sh https://get.ispconfig.org
 bash ispconfig3-install.sh
@@ -426,6 +428,8 @@ apt update && apt install certbot python3-certbot-apache
 ```
 
 ### Add SSL Certificate
+
+Important: Ensure the necessary ports are opened in the firewall. Refer to your checklist for the specific ports required. This process can also be managed via ISPConfig, which is generally the preferred method. However, since we want to access ISPConfig over HTTPS, we are performing this step here before setting up ISPConfig.
 
 ```bash
 certbot --apache -d dev.example.com
