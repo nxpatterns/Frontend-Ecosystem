@@ -8,6 +8,15 @@ defaults delete com.apple.spaces app-bindings
 killall Dock
 ```
 
+## Reset all Dock preferences (nuclear option)
+
+Remove apps from Dock, then re-add them (they default to "None")
+
+```bash
+defaults delete com.apple.dock
+killall Dock
+```
+
 ## Restart Font Registration
 
 ```bash
