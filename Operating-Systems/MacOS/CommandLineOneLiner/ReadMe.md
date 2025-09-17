@@ -1,5 +1,13 @@
 # CommandLine OneLiner
 
+## Clear all app-to-space assignments
+
+```bash
+# Clear all app-to-space assignments
+defaults delete com.apple.spaces app-bindings
+killall Dock
+```
+
 ## Restart Font Registration
 
 ```bash
