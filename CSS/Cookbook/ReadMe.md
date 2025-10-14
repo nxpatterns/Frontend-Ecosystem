@@ -35,7 +35,9 @@
 
 ## Offline Google Fonts (Angular & Co.)
 
-> See [Google Fonts Helper -> Example: EB Garamond](https://google-webfonts-helper.herokuapp.com/fonts/eb-garamond?subsets=latin)
+> See [Google Fonts Helper -> Example: EB Garamond](https://gwfh.mranftl.com/fonts/eb-garamond?subsets=latin)
+
+**Important -> Angular:** `/assets/...` in the URL, beginning with a slash!
 
 1) Download Fonts into e.g. assets/fonts/eb-garamond/.. (use the link above)
 2) Create a File e.g. assets/scss/fonts.scss and integrate font

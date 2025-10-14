@@ -2,6 +2,12 @@
 
 ## Use Google Fonts as Offline Web Fonts
 
+Visit: <https://gwfh.mranftl.com/fonts>
+
+BTW: Bulletproof Font Face Syntax in General (see [CSS Tricks](https://css-tricks.com/snippets/css/using-font-face/))
+
+**Important -> Angular:** `/assets/...` in the URL, beginning with a slash!
+
 - Visit [Google Fonts](https://fonts.google.com/) and select the fonts you want to use.
 - Click on the "Download" button to get the font files.
 - Extract the downloaded ZIP file and copy the font files (usually .ttf) to your project's font directory.
