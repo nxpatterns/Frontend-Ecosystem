@@ -11,6 +11,7 @@
 5. [Find Invoice Numbers Containing Letters](#find-invoice-numbers-containing-letters)
 6. [Find Invoice Numbers Not Matching a Specific Pattern](#find-invoice-numbers-not-matching-a-specific-pattern)
 7. [Find Companies Not Located in Europe (German)](#find-companies-not-located-in-europe-german)
+8. [Standardise Country Names (German)](#standardise-country-names-german)
 
 <!-- /code_chunk_output -->
 
@@ -117,4 +118,20 @@ WHERE a.land NOT IN (
     'Zypern Süd'
 )
 ORDER BY a.land;
+```
+
+## Standardise Country Names (German)
+
+Passiert oft beim Excel-Import...
+
+```sql
+-- Österreich
+UPDATE adresse
+SET land = 'Österreich'
+WHERE land IN (
+  'Austria', 'Avusturya', 'Ö', 'Oesterreich', 'Öste', 'Öster', 'Östereich',
+  'Österich', 'Österreic', 'österreich',
+  'Österreich Österreich',
+  'А', 'Аустрија'
+);
 ```
