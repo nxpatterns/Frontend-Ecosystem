@@ -216,5 +216,77 @@ ignoreregex =
 
 sudo fail2ban-regex /var/lib/docker/containers/<container-id>/<container-id>-json.log /etc/fail2ban/filter.d/postfix-pregreet.conf
 
+# Watch fail2ban log in real-time:
+sudo tail -f /var/log/fail2ban.log
+
+# Check mailserver internal temp directory
+docker exec -it mailserver ls -la /tmp/docker-mailserver/
+
+# Check Postfix accounts file
+docker exec -it mailserver cat /tmp/docker-mailserver/postfix-accounts.cf
+
+# Update mail server email (example)
+docker exec -it mailserver setup email update noreply@example.com
+
+# Check Docker volume mounts for mailserver
+docker inspect mailserver | grep -A 50 "Mounts"
+
+# Must backup:
+# /opt/mailserver/docker-data/dms/ (emails, config, state)
+# /etc/letsencrypt (SSL certs)
+# Docker Compose file
+# /etc/fail2ban/jail.local + filters
+
+# Locate Docker Compose file
+find /opt/mailserver -name "docker-compose.yml" -o -name "compose.yaml" 2>/dev/null
+# e.g. /opt/mailserver/docker-compose.yml
+
+# Identify all running services (exclude systemd and user services)
+systemctl list-units --type=service --state=running | grep -v "systemd\|user@"
+
+# Before any Backup update system packages
+sudo apt update && sudo apt upgrade -y
+
+# This will take a few minutes. After completion, check if kernel was updated:
+uname -r
+dpkg -l | grep linux-image-amd64 | grep ^ii
+
+# Get DKIM Key
+docker exec -it mailserver cat /tmp/docker-mailserver/opendkim/keys/example.com/mail.txt
+
+# Query Current DNS Records
+dig +short example.com A
+dig +short example.com MX
+dig +short example.com TXT
+dig +short _dmarc.example.com TXT
+dig +short mail._domainkey.example.com TXT
+
+# Check PTR (Reverse DNS)
+dig +short -x <your_server_ip>
+
+# Show Postfix data directory
+docker exec -it mailserver postconf data_directory
+# e.g. data_directory = /var/lib/postfix
+
+# It can be a symlink:
+docker exec -it mailserver ls -al /var/lib/postfix
+/var/lib/postfix -> /var/mail-state/lib-postfix
+
+# Check Postfix lib-postfix directory contents
+docker exec -it mailserver ls -la /var/mail-state/lib-postfix/
+
+# Show White List in Postfix
+docker exec -it mailserver strings /var/lib/postfix/postscreen_cache.db | head -50
+
+# Nuclear: Clear entire postscreen cache (resets all, legitimate mail delayed)
+docker exec -it mailserver rm /var/lib/postfix/postscreen_cache.db
+docker restart mailserver
+
+# Re-Check iptables INPUT rules
+sudo iptables -L INPUT -n -v
+
+# If you update filter, you need to restart fail2ban
+sudo systemctl restart fail2ban
+
 
 ```
